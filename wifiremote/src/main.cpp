@@ -22,6 +22,7 @@
 
 #include <WiFi.h>
 #include <esp_now.h>
+#include <esp_wifi.h>
 
 #endif
 
@@ -110,6 +111,13 @@ struct_message state;
 struct_message new_state;
 
 #ifdef ROLE_RECV
+#define ON_DOWN_SKIP_LOOPS (100)
+
+uint32_t delay_updown = 0;
+uint32_t delay_leftright = 0;
+#endif
+
+#ifdef ROLE_RECV
 void OnDataRecv(
 #if defined(ARDUINO_ARCH_ESP8266)
         uint8_t *mac,
@@ -153,11 +161,7 @@ void OnDataRecv(
 
 void setup(){
 
-    state.up = false;
-    state.down = false;
-    state.left = false;
-    state.right = false;
-    state.action = false;
+    memset(&state, 0, sizeof(state));
 
 #ifdef ROLE_SEND
     pinMode(BUTTON_UP, INPUT_PULLUP);
@@ -171,6 +175,12 @@ void setup(){
     pinMode(OUT_LEFT, OUTPUT);
     pinMode(OUT_RIGHT, OUTPUT);
     pinMode(OUT_ACTION, OUTPUT);
+
+    digitalWrite(OUT_UP, LOW);
+    digitalWrite(OUT_DOWN, LOW);
+    digitalWrite(OUT_LEFT, LOW);
+    digitalWrite(OUT_RIGHT, LOW);
+    digitalWrite(OUT_ACTION, LOW);
 
     pinMode(STOP_LEFT, INPUT_PULLUP);
     pinMode(STOP_RIGHT, INPUT_PULLUP);
@@ -305,12 +315,34 @@ void loop(){
     // timeout? stops?
     // cбросить пины
     if (is_timeout) {
-        digitalWrite(OUT_UP, LOW);
-        digitalWrite(OUT_DOWN, LOW);
-        digitalWrite(OUT_LEFT, LOW);
-        digitalWrite(OUT_RIGHT, LOW);
-        digitalWrite(OUT_ACTION, LOW);
-    } else {
+        new_state.up = LOW;
+        new_state.down = LOW;
+        new_state.left = LOW;
+        new_state.right = LOW;
+        new_state.action = LOW;
+    }
+
+    if ( (!new_state.down && state.down) || (!new_state.up && state.up) ) {
+        // кнопка опущена, включить задержку включения этой оси
+        delay_updown = ON_DOWN_SKIP_LOOPS;
+    }
+
+    if ( (!new_state.left && state.left) || (!new_state.right && state.right) ) {
+        // кнопка опущена, включить задержку включения этой оси
+        delay_leftright = ON_DOWN_SKIP_LOOPS;
+    }
+
+    if (delay_updown > 0) {
+        new_state.up = LOW;
+        new_state.down = LOW;
+    }
+
+    if (delay_leftright > 0) {
+        new_state.up = LOW;
+        new_state.down = LOW;
+    }
+
+    {
         // установить пины
         if (new_state.up != state.up) {
             digitalWrite(OUT_UP, new_state.up);
@@ -327,8 +359,17 @@ void loop(){
         if (new_state.action != state.action) {
             digitalWrite(OUT_ACTION, new_state.action);
         }
+
         // пометить установленными
         memcpy(&state, &new_state, sizeof(state));
+    }
+
+    if (delay_updown > 0) {
+        delay_updown--;
+    }
+
+    if (delay_leftright > 0) {
+        delay_leftright--;
     }
 
 #endif
