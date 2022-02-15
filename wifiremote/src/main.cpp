@@ -593,7 +593,7 @@ void loop(){
         leftright_blocked_at = millis();
     }
 
-    if ((millis() - updown_blocked_at) > BLOCK_TIMEOUT) {
+    if ((millis() - updown_blocked_at) < BLOCK_TIMEOUT) {
 #ifdef DEBUG_STOP
         Serial.println("axis reversion block is active (up/down)");
 #endif
@@ -601,7 +601,7 @@ void loop(){
         new_state.down = LOW;
     }
 
-    if ((millis() - leftright_blocked_at) > BLOCK_TIMEOUT) {
+    if ((millis() - leftright_blocked_at) < BLOCK_TIMEOUT) {
 #ifdef DEBUG_STOP
         Serial.println("axis reversion block is active (left/right)");
 #endif
