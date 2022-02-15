@@ -133,9 +133,35 @@ struct_message new_state;
 #if defined(TOUCH_UI) && defined(ROLE_SEND)
 
 // список кнопок
-static const char * btnm_map[] = {"U", "\n",
-                                  "L", "A", "R", "\n",
-                                  "D", ""};
+static const char * btnm_map[] = {
+    "_",
+    LV_SYMBOL_UP,
+    "_",
+    "\n",
+    LV_SYMBOL_LEFT,
+    LV_SYMBOL_CHARGE,
+    LV_SYMBOL_RIGHT,
+    "\n",
+    "_",
+    LV_SYMBOL_DOWN,
+    "_",
+    "",
+};
+
+static const lv_btnmatrix_ctrl_t btnm_control[] = {
+    LV_BTNMATRIX_CTRL_HIDDEN,
+    0,
+    LV_BTNMATRIX_CTRL_HIDDEN,
+    0,
+    0,
+    0,
+    LV_BTNMATRIX_CTRL_HIDDEN,
+    0,
+    LV_BTNMATRIX_CTRL_HIDDEN,
+    0,
+    0,
+    0,
+};
 
 TFT_eSPI tft = TFT_eSPI();
 Adafruit_FT6206 touchScreen = Adafruit_FT6206();
@@ -426,11 +452,13 @@ void setup(){
 
     btnm1 = lv_btnmatrix_create(lv_scr_act());
     lv_btnmatrix_set_map(btnm1, btnm_map);
+    lv_btnmatrix_set_ctrl_map(btnm1, btnm_control);
     lv_obj_align(btnm1, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_text_font(btnm1, &lv_font_montserrat_48, 0);
+    lv_obj_set_height(btnm1, lv_pct(90));
+    lv_obj_set_width(btnm1, lv_pct(90));
 
 #endif
-
-
 }
  
 void loop(){
@@ -448,19 +476,19 @@ void loop(){
         case LV_BTNMATRIX_BTN_NONE:
             // никакая кнопка не нажата
             break;
-        case 0:
+        case 1:
             new_state.up = HIGH;
             break;
-        case 1:
+        case 3:
             new_state.left = HIGH;
             break;
-        case 2:
+        case 4:
             new_state.action = HIGH;
             break;
-        case 3:
+        case 5:
             new_state.right = HIGH;
             break;
-        case 4:
+        case 7:
             new_state.down = HIGH;
             break;
     }
