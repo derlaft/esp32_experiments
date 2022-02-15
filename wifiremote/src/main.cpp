@@ -188,19 +188,6 @@ void setup(){
 
     memset(&state, 0, sizeof(state));
 
-#if defined(CHANGE_MAC)
-#if defined(ARDUINO_ARCH_ESP32)
-  esp_wifi_set_mac(WIFI_IF_STA, &SELF_ADDR[0]);
-#elif defined(ARDUINO_ARCH_ESP8266)
-  wifi_set_macaddr(STATION_IF, &SELF_ADDR[0]);
-#endif
-
-#if defined(DEBUG_MAC)
-  Serial.println("Changed MAC Adress");
-#endif
-#endif
-
-
 #ifdef ROLE_SEND
     pinMode(BUTTON_UP, INPUT_PULLUP);
     pinMode(BUTTON_DOWN, INPUT_PULLUP);
@@ -228,6 +215,18 @@ void setup(){
     Serial.setTimeout(SERIAL_READ_TIMEOUT);
 
     WiFi.mode(WIFI_STA);
+
+#if defined(CHANGE_MAC)
+#if defined(ARDUINO_ARCH_ESP32)
+  esp_wifi_set_mac(WIFI_IF_STA, &SELF_ADDR[0]);
+#elif defined(ARDUINO_ARCH_ESP8266)
+  wifi_set_macaddr(STATION_IF, &SELF_ADDR[0]);
+#endif
+
+#if defined(DEBUG_MAC)
+  Serial.println("Changed MAC Adress");
+#endif
+#endif
 
     // нопечатать mac-адрес
 #if defined(DEBUG_MAC)
