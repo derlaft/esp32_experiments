@@ -3,6 +3,8 @@
 
 #if defined(ARDUINO_ARCH_ESP8266)
 
+// скорость серийного порта
+// совпадает со стандартной
 #define SERIAL_SPEED 74880
 
 #include <ESP8266WiFi.h>
@@ -18,6 +20,8 @@
 
 #elif defined(ARDUINO_ARCH_ESP32)
 
+// скорость серийного порта
+// совпадает со стандартной
 #define SERIAL_SPEED 115200
 
 #include <WiFi.h>
@@ -27,32 +31,53 @@
 #endif
 
 
-// esp8266 boards (talk to each other):
+// выводить отладочные сообщения, связанные с MAC-адресом
+#define DEBUG_MAC
+// выводить отладочные сообщения, связанные с отправкой пакетов
+#define DEBUG_SEND
+// выводить отладочные сообщения, связанные с получением пакетов
+#define DEBUG_RECV
+// выводить отладочные сообщения, связанные с инициализацией
+#define DEBUG_INIT
+// выводить отладочные сообщения, связанные с пейрингом устройств
+#define DEBUG_PEER_ADD
+// выводить отладочные сообщения, связанные с ENDSTOP
+#define DEBUG_STOP
+
+// wifi-канал
+#define WIFI_CHANNEL 1
+// timeout чтения из серийного порта (вряд ли важно)
+#define SERIAL_READ_TIMEOUT 1000
+// задержка между итерациями главного цикла
+#define LOOP_INTERVAL 25
+// задержка, после которой считается, что сигнал потерян и сбрасывается состояние всего
+#define STATE_TIMEOUT 50
+
+// Платы esp8266 (говорят друг с другом):
 // 18:FE:34:FD:97:B2 (send)
 // 18:FE:34:FD:98:74 (recv)
 
+// Если установлена эта настройка, MAC-адрес будет перезаписан
+// Иначе (если выключено) нужно обязательно изменить адреса ниже
+// Адреса можно узнать, включив DEBUG_MAC
+#define CHANGE_MAC
+
+// выбор платы
+// сейчас происходит в env platformio.ini
 // #define BOARD_B2
-#define BOARD_74
+// #define BOARD_74
 
-
-#define DEBUG_MAC
-#define DEBUG_SEND
-#define DEBUG_RECV
-#define DEBUG_INIT
-#define DEBUG_PEER_ADD
-#define DEBUG_STOP
-
-#define WIFI_CHANNEL 1
-#define SERIAL_READ_TIMEOUT 1000
-#define LOOP_INTERVAL 25
-#define STATE_TIMEOUT 50
+uint8_t send_addr[] = {0x18, 0xFE, 0x34, 0xFD, 0x98, 0x74};
+uint8_t recv_addr[] = {0x18, 0xFE, 0x34, 0xFD, 0x97, 0xB2};
 
 #if defined(BOARD_B2)
-uint8_t peer_addr[] = {0x18, 0xFE, 0x34, 0xFD, 0x98, 0x74};
+#define PEER_ADDR recv_addr
+#define SELF_ADDR send_addr
 #define ROLE_SEND
 
 #elif defined(BOARD_74)
-uint8_t peer_addr[] = {0x18, 0xFE, 0x34, 0xFD, 0x97, 0xB2};
+#define PEER_ADDR send_addr
+#define SELF_ADDR recv_addr
 #define ROLE_RECV
 
 #endif
@@ -163,6 +188,19 @@ void setup(){
 
     memset(&state, 0, sizeof(state));
 
+#if defined(CHANGE_MAC)
+#if defined(ARDUINO_ARCH_ESP32)
+  esp_wifi_set_mac(WIFI_IF_STA, &SELF_ADDR[0]);
+#elif defined(ARDUINO_ARCH_ESP8266)
+  wifi_set_macaddr(STATION_IF, &SELF_ADDR[0]);
+#endif
+
+#if defined(DEBUG_MAC)
+  Serial.println("Changed MAC Adress");
+#endif
+#endif
+
+
 #ifdef ROLE_SEND
     pinMode(BUTTON_UP, INPUT_PULLUP);
     pinMode(BUTTON_DOWN, INPUT_PULLUP);
@@ -226,13 +264,13 @@ void setup(){
 
 #if defined(ARDUINO_ARCH_ESP8266)
 #ifdef ROLE_SEND
-    esp_now_add_peer(peer_addr, ESP_NOW_ROLE_SLAVE, WIFI_CHANNEL, NULL, 0);
+    esp_now_add_peer(PEER_ADDR, ESP_NOW_ROLE_SLAVE, WIFI_CHANNEL, NULL, 0);
 #else
-    esp_now_add_peer(peer_addr, ESP_NOW_ROLE_CONTROLLER, WIFI_CHANNEL, NULL, 0);
+    esp_now_add_peer(PEER_ADDR, ESP_NOW_ROLE_CONTROLLER, WIFI_CHANNEL, NULL, 0);
 #endif
 #elif defined(ARDUINO_ARCH_ESP32)
     esp_now_peer_info_t peerInfo;
-    memcpy(peerInfo.peer_addr, peer_addr, 6);
+    memcpy(peerInfo.peer_addr, PEER_ADDR, 6);
     peerInfo.channel = WIFI_CHANNEL;  
     peerInfo.encrypt = false;
     if (esp_now_add_peer(&peerInfo) != ESP_OK) {
@@ -271,7 +309,7 @@ void loop(){
     // посмотреть, изменилось ли что-то
     if (any_active || state_changed) {
         // отправить
-        esp_now_send(peer_addr, (uint8_t *) &new_state, sizeof(new_state));
+        esp_now_send(PEER_ADDR, (uint8_t *) &new_state, sizeof(new_state));
         // пометить отправленным
         memcpy(&state, &new_state, sizeof(state));
     }
@@ -338,8 +376,8 @@ void loop(){
     }
 
     if (delay_leftright > 0) {
-        new_state.up = LOW;
-        new_state.down = LOW;
+        new_state.left = LOW;
+        new_state.right = LOW;
     }
 
     {
