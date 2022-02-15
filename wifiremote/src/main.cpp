@@ -64,6 +64,8 @@
 #define LOOP_INTERVAL 25
 // задержка, после которой считается, что сигнал потерян и сбрасывается состояние всего
 #define STATE_TIMEOUT 50
+// задержка, после которой можно двигать ось в обратном направлении
+#define BLOCK_TIMEOUT 1000
 
 // Платы esp8266 (говорят друг с другом):
 // 18:FE:34:FD:97:B2 (send)
@@ -113,6 +115,8 @@ uint8_t recv_addr[] = {0x18, 0xFE, 0x34, 0xFD, 0x97, 0xB2};
 #define STOP_RIGHT 16
 
 unsigned long last_message_at;
+unsigned long leftright_blocked_at;
+unsigned long updown_blocked_at;
 
 #endif
 
@@ -258,7 +262,6 @@ void OnDataSent(
 #endif
 
 #ifdef ROLE_RECV
-#define ON_DOWN_SKIP_LOOPS (100)
 
 uint32_t delay_updown = 0;
 uint32_t delay_leftright = 0;
@@ -303,6 +306,8 @@ void OnDataRecv(
 #endif
 
     last_message_at = millis();
+    leftright_blocked_at = millis();
+    updown_blocked_at = millis();
 }
 #endif
 
@@ -580,20 +585,26 @@ void loop(){
 
     if ( (!new_state.down && state.down) || (!new_state.up && state.up) ) {
         // кнопка опущена, включить задержку включения этой оси
-        delay_updown = ON_DOWN_SKIP_LOOPS;
+        updown_blocked_at = millis();
     }
 
     if ( (!new_state.left && state.left) || (!new_state.right && state.right) ) {
         // кнопка опущена, включить задержку включения этой оси
-        delay_leftright = ON_DOWN_SKIP_LOOPS;
+        leftright_blocked_at = millis();
     }
 
-    if (delay_updown > 0) {
+    if ((millis() - updown_blocked_at) > BLOCK_TIMEOUT) {
+#ifdef DEBUG_STOP
+        Serial.println("axis reversion block is active (up/down)");
+#endif
         new_state.up = LOW;
         new_state.down = LOW;
     }
 
-    if (delay_leftright > 0) {
+    if ((millis() - leftright_blocked_at) > BLOCK_TIMEOUT) {
+#ifdef DEBUG_STOP
+        Serial.println("axis reversion block is active (left/right)");
+#endif
         new_state.left = LOW;
         new_state.right = LOW;
     }
