@@ -327,14 +327,16 @@ void OnDataRecv(
 #endif
 
     last_message_at = millis();
-    leftright_blocked_at = millis();
-    updown_blocked_at = millis();
 }
 #endif
 
 void setup(){
 
     memset(&state, 0, sizeof(state));
+#ifdef ROLE_RECV
+    leftright_blocked_at = millis();
+    updown_blocked_at = millis();
+#endif
 
 #ifdef ROLE_SEND
 #ifndef TOUCH_UI
