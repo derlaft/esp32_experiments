@@ -116,7 +116,7 @@ uint8_t send_addr[] = {0x18, 0xFE, 0x34, 0xFD, 0x97, 0xB2};
 #define OUT_LEFT 14
 #define OUT_RIGHT 12
 #define OUT_ACTION 13
-#define STOP_LEFT 2
+#define STOP_LEFT A0
 #define STOP_RIGHT 16
 
 unsigned long last_message_at;
