@@ -66,6 +66,8 @@
 #define STATE_TIMEOUT 50
 // задержка, после которой можно двигать ось в обратном направлении
 #define BLOCK_TIMEOUT 1000
+// задержка, после которой уменьшается яркость экрана
+#define SCREENSAVER_TIMEOUT 60000
 
 // Платы esp8266 (говорят друг с другом):
 // 18:FE:34:FD:97:B2 (send)
@@ -169,6 +171,8 @@ static const lv_btnmatrix_ctrl_t btnm_control[] = {
 
 TFT_eSPI tft = TFT_eSPI();
 Adafruit_FT6206 touchScreen = Adafruit_FT6206();
+unsigned long last_touch_event_at;
+uint8_t brightness = 255;
 
 // массив кнопок
 lv_obj_t * btnm1;
@@ -197,6 +201,17 @@ void my_input_read(lv_indev_drv_t * drv, lv_indev_data_t*data) {
      data->point.y = lasty;
      return;
   }
+
+  last_touch_event_at = millis();
+
+  if (brightness == LOW) {
+
+      brightness = HIGH;
+      digitalWrite(TFT_BL, brightness);
+      // avoid generating an event - wakeup
+      return;
+  }
+
 
   TS_Point touchPos = touchScreen.getPoint();
   data->state = LV_INDEV_STATE_PR;
@@ -415,9 +430,9 @@ void setup(){
     // TODO: check err
 
     // включить подсветку
-    // TODO: автоматически выключать её при неактивности
+    brightness = HIGH;
     pinMode(TFT_BL, OUTPUT);
-    digitalWrite(TFT_BL, 1);
+    digitalWrite(TFT_BL, brightness);
 
     // Start TouchScreen
     // requires custom I2C pinout
@@ -644,6 +659,18 @@ void loop(){
 #ifdef TOUCH_UI
     // обработка пользовательского интерфейса
     lv_timer_handler();
+
+    // уменьшить яркость в простое
+    if (brightness == HIGH && (millis() - last_touch_event_at) > SCREENSAVER_TIMEOUT) {
+        brightness = LOW;
+        digitalWrite(TFT_BL, brightness);
+    }
+    if (brightness == LOW && (millis() - last_touch_event_at) < SCREENSAVER_TIMEOUT) {
+        brightness = HIGH;
+        digitalWrite(TFT_BL, brightness);
+    }
+
+
 #endif
     // задержка до следующей итерации
     delay(LOOP_INTERVAL);
