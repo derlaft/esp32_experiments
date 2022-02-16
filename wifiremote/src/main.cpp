@@ -116,8 +116,9 @@ uint8_t send_addr[] = {0x18, 0xFE, 0x34, 0xFD, 0x97, 0xB2};
 #define OUT_LEFT 14
 #define OUT_RIGHT 12
 #define OUT_ACTION 13
-#define STOP_LEFT A0
 #define STOP_RIGHT 16
+#define STOP_LEFT A0
+#define STOP_LEFT_THRESHOLD 500
 
 unsigned long last_message_at;
 unsigned long leftright_blocked_at;
@@ -359,7 +360,6 @@ void setup(){
     digitalWrite(OUT_RIGHT, LOW);
     digitalWrite(OUT_ACTION, LOW);
 
-    pinMode(STOP_LEFT, INPUT_PULLUP);
     pinMode(STOP_RIGHT, INPUT_PULLUP);
 #endif
 
@@ -582,7 +582,7 @@ void loop(){
 #endif
     }
 
-    bool is_stop_left = !digitalRead(STOP_LEFT);
+    bool is_stop_left = !(analogRead(STOP_LEFT) > STOP_LEFT_THRESHOLD);
     bool is_stop_right = !digitalRead(STOP_RIGHT);
 
     if (new_state.left && is_stop_left) {
