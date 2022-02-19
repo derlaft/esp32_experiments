@@ -111,6 +111,7 @@ uint8_t send_addr[] = {0x18, 0xFE, 0x34, 0xFD, 0x97, 0xB2};
 
 #else
 
+#if defined(ARDUINO_ARCH_ESP8266)
 #define OUT_UP 5
 #define OUT_DOWN 4
 #define OUT_LEFT 14
@@ -118,6 +119,16 @@ uint8_t send_addr[] = {0x18, 0xFE, 0x34, 0xFD, 0x97, 0xB2};
 #define OUT_ACTION 13
 #define STOP_RIGHT 16
 #define STOP_LEFT A0
+#elif defined(ARDUINO_ARCH_ESP32)
+#define OUT_UP 16
+#define OUT_DOWN 17
+#define OUT_LEFT 18
+#define OUT_RIGHT 19
+#define OUT_ACTION 21
+#define STOP_RIGHT 22
+#define STOP_LEFT 23
+#endif
+
 #define STOP_LEFT_THRESHOLD 500
 
 unsigned long last_message_at;
@@ -361,6 +372,9 @@ void setup(){
     digitalWrite(OUT_ACTION, LOW);
 
     pinMode(STOP_RIGHT, INPUT_PULLUP);
+#ifdef ARDUINO_ARCH_ESP32
+    pinMode(STOP_LEFT, INPUT_PULLUP);
+#endif
 #endif
 
     Serial.begin(SERIAL_SPEED);
@@ -582,7 +596,12 @@ void loop(){
 #endif
     }
 
+
+#if defined(ARDUINO_ARCH_ESP8266)
     bool is_stop_left = !(analogRead(STOP_LEFT) > STOP_LEFT_THRESHOLD);
+#elif defined(ARDUINO_ARCH_ESP32)
+    bool is_stop_left = !digitalRead(STOP_LEFT);
+#endif
     bool is_stop_right = !digitalRead(STOP_RIGHT);
 
     if (new_state.left && is_stop_left) {
