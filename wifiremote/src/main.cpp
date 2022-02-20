@@ -411,7 +411,7 @@ void OnDataRecv(
             break;
         case on_boot:
             // показать popup инициализации
-            lv_obj_t * mbox = lv_msgbox_create(NULL, msgbox_title, msgbox_messages[0], msgbox_buttons, true);
+            lv_obj_t * mbox = lv_msgbox_create(NULL, msgbox_title, msgbox_messages[0], msgbox_buttons, false);
             lv_obj_add_event_cb(mbox, msgbox_cb, LV_EVENT_VALUE_CHANGED, NULL);
             lv_obj_set_style_text_font(mbox, &hack_14_cyr, 0);
             lv_obj_center(mbox);
