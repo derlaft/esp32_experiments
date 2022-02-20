@@ -68,6 +68,8 @@
 #define BLOCK_TIMEOUT 1000
 // задержка, после которой уменьшается яркость экрана
 #define SCREENSAVER_TIMEOUT 60000
+// переодичность отправки сообщений о здоровье
+#define HEALTH_INTERVAL 1000
 
 // Платы esp8266 (говорят друг с другом):
 // 18:FE:34:FD:97:B2 (send)
@@ -137,6 +139,10 @@ unsigned long updown_blocked_at;
 
 #endif
 
+#ifdef REPORT_MESSAGES
+unsigned long last_report_at;
+#endif
+
 typedef struct struct_message {
     bool left;
     bool right;
@@ -144,6 +150,15 @@ typedef struct struct_message {
     bool down;
     bool action;
 } struct_message;
+
+enum report_message_type {
+    health,
+    on_boot,
+};
+
+typedef struct struct_report_message {
+    report_message_type type;
+} struct_report_message;
 
 // общие переменные состояния
 // используются и на RECV, и на SEND
@@ -184,8 +199,30 @@ static const lv_btnmatrix_ctrl_t btnm_control[] = {
     0,
 };
 
+// список кнопок всплывающего сообщения
+static const char * msgbox_buttons[] = {
+    "Принято",
+    ""
+};
+
+static const char * msgbox_title = "Сообщение от приёмника";
+
+static const char * msgbox_messages[] = {
+    "Приемник сообщил о загрузке.",
+    ""
+};
+
+#ifdef REPORT_MESSAGES
+static void msgbox_cb(lv_event_t * e)
+{
+    lv_obj_t * obj = lv_event_get_current_target(e);
+    lv_msgbox_close(obj);
+}
+#endif
+
 TFT_eSPI tft = TFT_eSPI();
 Adafruit_FT6206 touchScreen = Adafruit_FT6206();
+
 
 #ifdef SCREENSAVER
 unsigned long last_touch_event_at;
@@ -193,7 +230,12 @@ uint8_t brightness = 255;
 #endif
 
 // массив кнопок
-lv_obj_t * btnm1;
+lv_obj_t * btnm;
+
+#ifdef REPORT_MESSAGES
+// индикатор состояния соединения
+lv_obj_t * led;
+#endif
 
 // буфер отрисовки
 static const uint16_t screenWidth  = TFT_HEIGHT;
@@ -294,13 +336,12 @@ void OnDataSent(
 }
 #endif
 
-#ifdef ROLE_RECV
+#if defined(ROLE_RECV) || defined(REPORT_MESSAGES)
 
 uint32_t delay_updown = 0;
 uint32_t delay_leftright = 0;
 #endif
 
-#ifdef ROLE_RECV
 void OnDataRecv(
 #if defined(ARDUINO_ARCH_ESP8266)
         uint8_t *mac,
@@ -312,6 +353,9 @@ void OnDataRecv(
         int len
 #endif
 ) {
+#ifdef ROLE_RECV
+
+    // логика приёма сообщения на приёмнике
 
     if (sizeof(new_state) != len) {
 #if defined(DEBUG_RECV)
@@ -339,8 +383,45 @@ void OnDataRecv(
 #endif
 
     last_message_at = millis();
-}
+#else
+
+#ifdef REPORT_MESSAGES
+
+    // логика приёма сообщения на пульте
+    static struct_report_message got_msg;
+    if (sizeof(got_msg) != len) {
+#if defined(DEBUG_RECV)
+        Serial.print("Unexpected bytes received: ");
+        Serial.println(len);
+        return;
 #endif
+    }
+
+    // скопировать сообщение
+    memcpy(&got_msg, incoming, sizeof(got_msg));
+    last_report_at = millis();
+
+#if defined(DEBUG_RECV)
+        Serial.print("Received status message:");
+        Serial.println(got_msg.type);
+#endif
+
+    switch (got_msg.type) {
+        case health:
+            break;
+        case on_boot:
+            // показать popup инициализации
+            lv_obj_t * mbox = lv_msgbox_create(NULL, msgbox_title, msgbox_messages[0], msgbox_buttons, true);
+            lv_obj_add_event_cb(mbox, msgbox_cb, LV_EVENT_VALUE_CHANGED, NULL);
+            lv_obj_set_style_text_font(mbox, &hack_14_cyr, 0);
+            lv_obj_center(mbox);
+            break;
+    }
+
+#endif
+
+#endif
+}
 
 void setup(){
 
@@ -348,6 +429,10 @@ void setup(){
 #ifdef ROLE_RECV
     leftright_blocked_at = millis();
     updown_blocked_at = millis();
+#endif
+
+#ifdef REPORT_MESSAGES
+    last_report_at = millis();
 #endif
 
 #ifdef ROLE_SEND
@@ -409,7 +494,6 @@ void setup(){
         return;
     }
 
-
 #if defined(ARDUINO_ARCH_ESP8266)
 #ifdef ROLE_SEND
     esp_now_set_self_role(ESP_NOW_ROLE_CONTROLLER);
@@ -421,7 +505,7 @@ void setup(){
 #endif
 #endif
 
-#ifdef ROLE_RECV
+#if defined(ROLE_RECV) || defined(REPORT_MESSAGES)
     esp_now_register_recv_cb(OnDataRecv);
 #endif
 
@@ -497,15 +581,39 @@ void setup(){
     indev_drv.read_cb = my_input_read;
     lv_indev_drv_register( &indev_drv );
 
-    btnm1 = lv_btnmatrix_create(lv_scr_act());
-    lv_btnmatrix_set_map(btnm1, btnm_map);
-    lv_btnmatrix_set_ctrl_map(btnm1, btnm_control);
-    lv_obj_align(btnm1, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_set_style_text_font(btnm1, &lv_font_montserrat_48, 0);
-    lv_obj_set_height(btnm1, lv_pct(90));
-    lv_obj_set_width(btnm1, lv_pct(90));
+    // set root font
+    lv_obj_set_style_text_font(lv_scr_act(), &hack_14_cyr, 0);
+
+    // матрица кнопок для управления направлением
+    btnm = lv_btnmatrix_create(lv_scr_act());
+    lv_btnmatrix_set_map(btnm, btnm_map);
+    lv_btnmatrix_set_ctrl_map(btnm, btnm_control);
+    lv_obj_align(btnm, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_text_font(btnm, &lv_font_montserrat_40, 0);
+    lv_obj_set_height(btnm, lv_pct(90));
+    lv_obj_set_width(btnm, lv_pct(90));
+
+    // индикатор состояния соединения
+#ifdef REPORT_MESSAGES
+    led  = lv_led_create(btnm);
+    lv_obj_align(led, LV_ALIGN_TOP_RIGHT, -10, -10);
+    lv_led_set_brightness(led, 150);
+    lv_led_set_color(led, lv_palette_main(LV_PALETTE_GREEN));
+    lv_led_off(led);
+#endif
+
 
 #endif
+
+#if defined(ROLE_RECV) && defined(REPORT_MESSAGES)
+    static struct_report_message send = {on_boot};
+    esp_now_send(PEER_ADDR, (uint8_t *) &send, sizeof(send));
+#ifdef DEBUG_SEND
+    Serial.println("trying to send on-boot notification msg");
+#endif
+
+#endif
+
 }
  
 void loop(){
@@ -518,7 +626,7 @@ void loop(){
     memset(&new_state, 0, sizeof(new_state));
 
     // прочитать состояние кнопки
-    uint32_t id = lv_btnmatrix_get_selected_btn(btnm1);
+    uint32_t id = lv_btnmatrix_get_selected_btn(btnm);
     switch (id) {
         case LV_BTNMATRIX_BTN_NONE:
             // никакая кнопка не нажата
@@ -704,8 +812,30 @@ void loop(){
     }
 #endif
 
+#endif /* ifdef TOUCH_UI */
 
+#ifdef REPORT_MESSAGES
+
+#ifdef ROLE_RECV
+    if ((millis() - last_report_at) > HEALTH_INTERVAL) {
+        static struct_report_message send = {health};
+        esp_now_send(PEER_ADDR, (uint8_t *) &send, sizeof(send));
+#ifdef DEBUG_SEND
+        Serial.println("trying to send health notification msg");
 #endif
+        // reset counter
+        last_report_at = millis();
+    }
+#else
+#ifdef TOUCH_UI
+    if ((millis() - last_report_at) > HEALTH_INTERVAL * 2) {
+        lv_led_off(led);
+    } else {
+        lv_led_on(led);
+    }
+#endif /* ifdef TOUCH_UI */
+#endif /* ifdef ROLE_RECV */
+#endif /* ifdef REPORT_MESSAGES */
     // задержка до следующей итерации
     delay(LOOP_INTERVAL);
 }
