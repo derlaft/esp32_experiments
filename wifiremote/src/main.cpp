@@ -168,6 +168,10 @@ struct_message new_state;
 // начало блока, связанного с пользовательским интерфейсом
 #if defined(TOUCH_UI) && defined(ROLE_SEND)
 
+#ifdef REPORT_MESSAGES
+bool is_popup = false;
+#endif
+
 // список кнопок
 static const char * btnm_map[] = {
     "_",
@@ -217,6 +221,7 @@ static void msgbox_cb(lv_event_t * e)
 {
     lv_obj_t * obj = lv_event_get_current_target(e);
     lv_msgbox_close(obj);
+    is_popup = false;
 }
 #endif
 
@@ -411,10 +416,14 @@ void OnDataRecv(
             break;
         case on_boot:
             // показать popup инициализации
-            lv_obj_t * mbox = lv_msgbox_create(NULL, msgbox_title, msgbox_messages[0], msgbox_buttons, false);
-            lv_obj_add_event_cb(mbox, msgbox_cb, LV_EVENT_VALUE_CHANGED, NULL);
-            lv_obj_set_style_text_font(mbox, &hack_14_cyr, 0);
-            lv_obj_center(mbox);
+            // только если уже не показан
+            if (!is_popup) {
+                lv_obj_t * mbox = lv_msgbox_create(NULL, msgbox_title, msgbox_messages[0], msgbox_buttons, false);
+                lv_obj_add_event_cb(mbox, msgbox_cb, LV_EVENT_VALUE_CHANGED, NULL);
+                lv_obj_set_style_text_font(mbox, &hack_14_cyr, 0);
+                lv_obj_center(mbox);
+                is_popup = true;
+            }
             break;
     }
 
@@ -596,7 +605,7 @@ void setup(){
     // индикатор состояния соединения
 #ifdef REPORT_MESSAGES
     led  = lv_led_create(btnm);
-    lv_obj_align(led, LV_ALIGN_TOP_RIGHT, -10, -10);
+    lv_obj_align(led, LV_ALIGN_TOP_RIGHT, -10, 0);
     lv_led_set_brightness(led, 150);
     lv_led_set_color(led, lv_palette_main(LV_PALETTE_GREEN));
     lv_led_off(led);
