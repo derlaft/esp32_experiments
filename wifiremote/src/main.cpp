@@ -1,3 +1,4 @@
+// clang-format off
 #include <Arduino.h>
 
 #ifdef TOUCH_UI
@@ -532,6 +533,7 @@ void setup(){
     memcpy(peerInfo.peer_addr, PEER_ADDR, 6);
     peerInfo.channel = WIFI_CHANNEL;  
     peerInfo.encrypt = false;
+    peerInfo.ifidx=WIFI_IF_AP;
     if (esp_now_add_peer(&peerInfo) != ESP_OK) {
 #if defined(DEBUG_PEER_ADD)
         Serial.println("Failed to add peer");
